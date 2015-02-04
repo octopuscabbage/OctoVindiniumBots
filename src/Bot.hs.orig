@@ -1,0 +1,48 @@
+module Bot
+        ( bot
+        )
+    where
+import Vindinium
+
+import Data.Maybe (fromJust)
+import Control.Monad (liftM)
+import Control.Monad.IO.Class (liftIO)
+
+import Util.Utils
+import Util.Pathfinding 
+import qualified HeatMap.PIFM as H
+
+import System.Console.ANSI
+
+bot :: Bot
+bot = myBot
+
+myBot :: State -> Vindinium Dir
+myBot currentState = do
+<<<<<<< HEAD
+	printState currentState
+	return (if shouldDrink currentHero then findMoveTo $  findClosestTavern currentState else findMoveTo $ findClosestFreeMine currentState)
+=======
+	liftIO clearScreen
+	liftIO $ setCursorPosition 0 0
+	liftIO $ print $ "Current Position: " ++ show currentPosition 
+	liftIO $ putStr $ prettyPrintBoard currentState
+	liftIO $ putStr "\n"
+	return $ H.getNextMove currentPosition currentState
+>>>>>>> origin/heatmap
+	where 	currentBoard = getBoard currentState
+		currentPosition = getCurrentPosition currentState
+		currentHero = getHero currentState
+		findMoveTo p  = findNextMove currentPosition p currentState
+
+printState state  = do
+	liftIO $ clearScreen
+	liftIO $ setCursorPosition 0 0
+	liftIO $ print $ "Current Position: " ++ show currentPosition
+	liftIO $ putStr $ prettyPrintBoard state
+	liftIO $ putStr "\n"
+	where currentPosition = getCurrentPosition state
+
+
+healthThreshold = 40
+shouldDrink hero = heroLife hero < healthThreshold

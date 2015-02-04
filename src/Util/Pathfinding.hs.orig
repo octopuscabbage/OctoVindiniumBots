@@ -1,0 +1,126 @@
+<<<<<<< HEAD:src/Pathfinding.hs
+module Pathfinding where
+=======
+module Util.Pathfinding (
+	findNextMove,
+	pointToDir
+	) where
+>>>>>>> origin/heatmap:src/Util/Pathfinding.hs
+import Vindinium
+import Util.Utils
+import Util.DistanceCalcs
+import Data.List
+import Data.List.Utils
+import qualified Data.Heap as H
+import Data.Maybe
+
+import Debug.Trace
+
+type PathFinderF = (Int,Int) -> (Int,Int) -> State -> Dir
+
+findNextMove:: PathFinderF
+findNextMove = slightlyImprovedWikiPathfinder
+
+quickPathFinder:: (Int, Int) -> (Int, Int) -> State-> Dir
+quickPathFinder (aX,aY) (bX,bY) state
+	| aIsWestOfb && isCurrentlyWalkable eastSquare = East
+	| aIsEastOfb && isCurrentlyWalkable westSquare = West
+	| aIsNorthOfb && isCurrentlyWalkable southSquare = South
+	| aIsSouthOfb && isCurrentlyWalkable northSquare = North
+	| isCurrentlyWalkable eastSquare = East
+	| isCurrentlyWalkable southSquare = South
+	| isCurrentlyWalkable northSquare = North
+	| isCurrentlyWalkable westSquare = West
+	| otherwise = Stay --What the fuck happened
+	where 	isCurrentlyWalkable = isWalkable state
+		eastSquare = (aX+1,aY)
+		westSquare = (aX-1,aY)
+		northSquare = (aX,aY+1)
+		southSquare = (aX,aY-1)
+		aIsWestOfb = aX < bX
+		aIsEastOfb = aX > bX
+		aIsNorthOfb = aY > bY
+		aIsSouthOfb = aY < bY
+
+shitQuickPathfinder:: (Int, Int) -> (Int, Int) -> State-> Dir
+shitQuickPathfinder player target state = pointToDir player $  getClosest $ getWalkables
+	where 	getClosest ps = foldl1 (\cur test -> if (walkableDistance target test) < (walkableDistance target cur) then test else cur) ps
+		getWalkables = filter (isWalkable state) $ getAllAdjacent player
+		
+fourSteps:: (Int, Int) -> (Int, Int) -> State -> Dir
+fourSteps player target state = pointToDir player $  foldl1 (\cur test -> if(walkableDistance test target < walkableDistance cur target) then test else cur) $  filter (isWalkable state) $ getAllAdjacent player
+	
+awfulFinder:: (Int, Int) -> (Int, Int) -> State -> Dir
+awfulFinder player target state = pointToDir player $ head $ filter (isWalkable state) $ getAllAdjacent player
+
+getAllAdjacent (x,y) = [(x+1,y),(x-1,y),(x,y+1),(x,y-1)]
+
+--Walking from point a to point b what direction do you have to go
+pointToDir:: (Int,Int) -> (Int,Int) -> Dir
+pointToDir (aX,aY) (bX,bY)
+	| (aX < bX) = East
+	| (aX > bX) = West
+	| (aY > bY) = North
+	| (aY < bY) = South
+	| otherwise = Stay
+{--
+dijk:: PathFinderF
+dijk pointA pointB state = convertToDir $ minimum $ filter isAdjacent $ getDistances 
+	where 	getDistances = dijk' state pointB [] $ H.fromList [PointCost pointA 0]
+		isAdjacent p = (getAllAdjacent pointA) `containsE` (getPoint p)
+		convertToDir (PointCost p _) = pointToDir pointA p
+
+dijk':: State -> (Int, Int) -> [PointCost] -> H.MinHeap PointCost -> [PointCost]
+dijk' state target elems heap =  case (nextElem,nextHeap) of
+					(Nothing,Nothing) -> elems
+					(Just e,Nothing) -> elems
+					(Nothing,_) -> undefined
+					(Just e,Just h) -> if(getPoint e == target) then elems else dijk' state target (elems ++ (map (\p -> PointCost p (getCost e + 1))  $ walkableAdjacents state $ getPoint e)) $ h
+	where 	nextElem = H.viewHead heap
+		nextHeap = H.viewTail heap
+
+<<<<<<< HEAD:src/Pathfinding.hs
+walkableAdjacents state p = filter (isWalkable state) $ getAllAdjacent p
+=======
+--}
+>>>>>>> origin/heatmap:src/Util/Pathfinding.hs
+
+
+containsE xs e = xs `intersect` [e] /= []
+<<<<<<< HEAD:src/Pathfinding.hs
+
+=======
+{--
+wikiPathFinder::PathFinderF
+wikiPathFinder pointA pointB state = getPoint $ minimum $ wikiPathFinder' pointB [PointCost pointA 0] state 
+>>>>>>> origin/heatmap:src/Util/Pathfinding.hs
+
+slightlyImprovedWikiPathfinder:: PathFinderF
+slightlyImprovedWikiPathfinder pointA pointB state 
+	| (contains [pointB] $  getAllAdjacent pointA) = pointToDir pointA pointB
+	| (length adjacencies == 1) =  pointToDir pointA $ head $ adjacencies
+	| otherwise =  wikiPathFinder pointA pointB state
+	
+	where adjacencies = walkableAdjacents state pointA 
+
+wikiPathFinder::PathFinderF
+wikiPathFinder pointA pointB state = if (null points) then Stay else  pointToDir pointA $ getPoint $ minimum $ filter (\ (PointCost p _)-> getAllAdjacent pointA `containsE` p) $ points
+	where points = wikiPathFinder' pointA [PointCost pointB 0] [] state 
+
+wikiPathFinder':: (Int,Int) -> [PointCost] -> [PointCost] -> State -> [PointCost]
+wikiPathFinder' target queue oldQueue state
+ | (oldQueue == queue) = [] 
+ | (any (\(PointCost p _) -> p == target) newQueue)=  newQueue 
+ | otherwise = wikiPathFinder' target newQueue queue state
+	where 	getAdjacensies:: PointCost -> [PointCost]	
+		getAdjacensies (PointCost testpoint c) = map (\p -> PointCost p (c+1)) $ getAllAdjacent testpoint
+		newQueue:: [PointCost]
+		newQueue =  filter (\(PointCost p _) -> isWalkable state p) $ concatMap getAdjacensies queue ++ queue
+		keepLowest:: [PointCost] -> [PointCost]
+		keepLowest xs = nub $ map (\p -> getMinimumEquivolent p  xs) xs
+			where	getMinimumEquivolent:: PointCost -> [PointCost] -> PointCost 
+				getMinimumEquivolent p  xs= minimum $ filter (\ (PointCost t _) -> t == getPoint p) xs
+
+traceShowThis a = traceShow a a
+
+--}
