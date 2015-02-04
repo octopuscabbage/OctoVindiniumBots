@@ -1,25 +1,7 @@
-Vindinium Starter Haskell
-=========================
+forked from the vindinium haskell starter
 
-Haskell starter for [Vindinium](http://vindinium.org).
+Two implmentations
 
-Creating Your Bot
------------------
+The more advanced one works on a heatmap type deal
 
-You can create your bot by editing the `Bot.bot` function.
-
-Executing Your Bot
-------------------
-
-Install the project using cabal...
-
-```
-cabal install
-```
-
-...and execute one of the following commands:
-
-```
-vindinium training [--turns 10] [--url http://custom.vindinium.url]
-vindinium arena [--url http://custom.vindinium.url]
-```
+The less advanced one works on a pathfinding algorithm and just makes binary choices
