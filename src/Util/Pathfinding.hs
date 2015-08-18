@@ -1,28 +1,34 @@
 module Util.Pathfinding where
 import Vindinium
+
 import Util.Utils
 import Util.DistanceCalcs
+import Util.Types
+
 import Data.List
 import Data.List.Utils
 import qualified Data.Heap as H
 import Data.Maybe
 
 
-type PathFinderF = (Int,Int) -> (Int,Int) -> State -> Dir
+
+
+type PathFinderF = Point -> Point -> State -> Dir
 
 findNextMove:: PathFinderF
 findNextMove = slightlyImprovedWikiPathfinder
 
-getAllAdjacent (x,y) = [(x+1,y),(x-1,y),(x,y+1),(x,y-1)]
+getAllAdjacent (Point x y) = [(Point x+1 y),(Point (x-1) y),(Point x (y+1)),(Point x (y-1))]
 
 --Walking from point a to point b what direction do you have to go
-pointToDir:: (Int,Int) -> (Int,Int) -> Dir
-pointToDir (aX,aY) (bX,bY)
+pointToDir:: Point -> Point -> Dir
+pointToDir (Point aX aY) (Point bX bY)
 	| (aX < bX) = East
 	| (aX > bX) = West
 	| (aY > bY) = North
 	| (aY < bY) = South
 	| otherwise = Stay
+
 
 walkableAdjacents state p = filter (isWalkable state) $ getAllAdjacent p
 

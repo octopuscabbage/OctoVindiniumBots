@@ -5,89 +5,103 @@ import Vindinium
 import Vindinium.Types
 import Data.List
 import Util.DistanceCalcs
+import Util.Types
 import Data.Tuple
+import Control.Monad.Reader
 
-getBoard:: State -> Board
-getBoard = gameBoard . stateGame
+getBoard:: Reader State Board
+getBoard = gameBoard $ stateGame ask
 
-getBoardTiles:: State-> [Tile]
-getBoardTiles = boardTiles . getBoard
+getBoardTiles:: Reader State [Tile]
+getBoardTiles = boardTiles $ getBoard $ ask
 
-getBoardSize:: State -> Int
-getBoardSize = boardSize . getBoard
+getBoardSize:: Reader State Int
+getBoardSize = boardSize $ getBoard $ ask
 
-getHeroID:: State -> HeroId
-getHeroID = heroId . stateHero
+getHeroID:: Reader State HeroId
+getHeroID = heroId $ stateHero $ ask
 
-getCurrentPosition:: State -> (Int,Int)
-getCurrentPosition =  posToPoint . heroPos . stateHero
+getCurrentPosition:: Reader State Point
+getCurrentPosition =  posToPoint $ heroPos $ stateHero ask
+
+getHeroes' :: Reader State [Hero]
+getHeroes' =  gameHeroes $ stateGame $ ask
 
 getHero = stateHero
 
-findClosestTavern:: State -> (Int,Int)
-findClosestTavern state = findClosestType TavernTile state
+findClosestTavern:: Reader State Point
+findClosestTavern = findClosestType TavernTile ask
 
-findClosestFreeMine:: State -> (Int,Int)
-findClosestFreeMine state = findClosestType (MineTile Nothing) state
+findClosestFreeMine:: Reader State Point
+findClosestFreeMine  = findClosestType (MineTile Nothing) ask
 
-findClosestType:: Tile -> State -> (Int,Int)
+findClosestType:: Tile -> Reader State Point
 findClosestType tileType state = findNearestNeighbor heroPos  $  getAllTileType tileType state
 	where heroPos = getCurrentPosition state
 
 	
 
 --TileTypes
-getAllTaverns:: State -> [(Int,Int)]
+getAllTaverns:: Reader State [Point]
 getAllTaverns = getAllTileType TavernTile
 
-getAllMines:: State -> [(Int,Int)]
-getAllMines state = filterTiles isMine state
+getAllMines:: Reader State [Point]
+getAllMines  = filterTiles isMine 
         where   isMine (MineTile _ ) = True
                 isMine _ = False
 
-getFreeMines:: State -> [(Int,Int)]
+getFreeMines:: Reader State [Point]
 getFreeMines = getAllTileType (MineTile Nothing)
 
-getAllHeros state = filterTiles isHero state
+getAllHeros :: Reader State [Point]
+getAllHeros  = filterTiles isHero 
         where   isHero (HeroTile _) = True
                 isHero _ = False
 
-getAllTileType:: Tile -> State -> [(Int,Int)]
+getAllTileType:: Tile -> Reader  State [Point]
 getAllTileType tileType state = map (convertMapIndexToPoint size) $ foldl (\ cur (i,curType)-> if curType == tileType then i:cur else cur) [] $ zip [0..] tiles
 	where 	tiles = getBoardTiles state
 		size = getBoardSize state	
 
-filterTiles:: (Tile-> Bool) -> State -> [(Int,Int)]
-filterTiles f state =  map (\(index,_) -> convertMapIndexToPoint (getBoardSize state) index) $ filter (\(_,tiletype) -> f tiletype)  (zip [0..] $ getBoardTiles state)
+filterTiles:: (Tile-> Bool) -> Reader State [Point]
+filterTiles f =do
+  boardTiles <- getBoardTiles
+  boardSize <- getBoardSize
+  return $ map (\(index,_) -> convertMapIndexToPoint (boardSize) index) $ filter (\(_,tiletype) -> f tiletype)  (zip [0..] $ boardTiles)
+                    
 
-isWalkable:: State -> (Int, Int) -> Bool
-isWalkable state point  = inBoard state point && (isTileType FreeTile state  point || (isHero $ mapAtPoint point state))
+isWalkable:: Point -> Reader State Bool
+isWalkable point  = ask >>= \state -> inBoard state point && (isTileType FreeTile state  point || (isHero $ mapAtPoint point state))
 
 isHero:: Tile -> Bool
 isHero (HeroTile (HeroId _ )) = True
 isHero _ = False
 	
 
-isTileType:: Tile -> State -> (Int, Int) -> Bool
-isTileType tiletype state point = (tiles !! convertPointToMapIndex size point) == tiletype
-	where 	tiles = getBoardTiles state
-		size = getBoardSize state
-
-
+isTileType:: Tile -> Point ->  Reader State  Bool
+isTileType tiletype point = do
+                            tiles <- getBoardTiles
+                            size <- getBoardSize
+                            return (tiles !! convertPointToMapIndex size point) == tiletype
 
 --Map Conversion
-mapAtPoint:: (Int,Int) -> State -> Tile
-mapAtPoint p state = getBoardTiles state !! (convertPointToMapIndex (getBoardSize state) p)
-convertPointToMapIndex::Int -> (Int,Int) -> Int
-convertPointToMapIndex size (x,y)  = y * (size) + x
+mapAtPoint:: Point -> Reader State Tile
+mapAtPoint p state =do
+  tiles <- getBoardTiles
+  size <- getBoardSize 
+  return $ tiles !! (convertPointToMapIndex size p)
 
 
-convertMapIndexToPoint::Int -> Int -> (Int, Int)
-convertMapIndexToPoint size i = swap $ i `divMod` (size)
 
-inBoard :: State -> (Int, Int) -> Bool
-inBoard state (x, y) = x >= 0 && x < s && y >= 0 && y < s
-	where s = getBoardSize state
+convertPointToMapIndex:: Point -> Reader State Int
+convertPointToMapIndex (x,y)  = getBoardSize >>= \size -> return $ y * size + x
+
+
+convertMapIndexToPoint::Int -> Reader State (Int, Int)
+convertMapIndexToPoint i = getBoardSize >>= \size -> return $ fromTuple $ swap $ i `divMod` size
+
+inBoard ::  Point -> Reader State Bool
+inBoard (Point x y) = getBoardSize >>= \s -> return $ x >= 0 && x < s && y >= 0 && y < s
 
 
 posToPoint::Pos -> (Int,Int)
@@ -95,15 +109,16 @@ posToPoint pos = (posY pos,posX pos)
 
 
 --ASCII ART
-prettyPrintBoard:: State -> String
-prettyPrintBoard state =  concat $ concat $  intersperse ["\n"] $ chunk size $ map show board
+prettyPrintBoard:: Reader State String
+prettyPrintBoard state =  do
+  board <- getBoardTiles
+  size <- getBoardSize
+  return $ concat $ concat $  intersperse ["\n"] $ chunk size $ map show board
 	where 	chunk _ [] = []
 		chunk n xs = (take n xs):(chunk n(drop n xs))
-		board = getBoardTiles state
-		size = getBoardSize state
 
-allPoints:: Int -> [(Int,Int)]
-allPoints size = concatMap (\n -> [(n,x) | x <- [1..size] ]) [1..size]
+allPoints:: Reader State [Point]
+allPoints  = getBoardSize >>= \size -> concatMap (\n -> [(Point n x) | x <- [1..size] ]) [1..size]
 
 data PointValue = PointValue (Int,Int) Int deriving (Eq, Show)
 getPoint (PointValue p _) = p
@@ -112,17 +127,17 @@ getCost (PointValue _ c ) = c
 instance Ord PointValue where
         (PointValue a _) `compare` (PointValue b _ ) = a `compare` b
 
-tileAt p state = getBoardTiles state !! convertPointToMapIndex size p
-        where size = getBoardSize state
+tileAt:: Point -> Reader State Tile                                                     
+tileAt p =do tiles <- getBoardTiles
+             size <- getBoardSize
+             return $ tiles !! convertPointToMapIndex size p
 
-myId state = getHeroIDValue $ getHeroID state
-	where getHeroIDValue (HeroId id) = id
+canReach:: Point -> Point -> Reader State Bool
+canReach a b = all (isTileType FreeTile) $ pointsBetween a b 
 
-canReach state a b = all (isTileType FreeTile state) $ pointsBetween a b 
-
-pointsBetween:: (Int,Int) -> (Int,Int) -> [(Int,Int)]
+pointsBetween:: Point -> Point -> [(Int,Int)]
 pointsBetween pointA pointB = pointsBetween' pointA pointB []
-	where pointsBetween' a@(aX,aY) b@(bX,bY) cur
+	where pointsBetween' a@(Point aX aY) b@(Point bX bY) cur
 		| (a == b) = if null cur then [] else init cur 
 		| otherwise = pointsBetween' nextPoint b (cur++[nextPoint])
 			where nextPoint = calcYDelta $ calcXDelta
@@ -134,6 +149,8 @@ pointsBetween pointA pointB = pointsBetween' pointA pointB []
 						| (aY > bY) = (cX,aY-1)
 						| (aY < bY) = (cX,aY+1)
 						| otherwise = cur
-getHeroFromId:: Int -> State -> Hero
-getHeroFromId id state = head $ filter (\hero -> id == (getIdValue $ heroId $ hero)) $ (gameHeroes $ stateGame state)
+getHeroFromId:: Int -> Reader State Hero
+getHeroFromId id  = do
+                    heros <- gameHeroes'
+                    return $ head $ filter (\hero -> id == (getIdValue $ heroId $ hero)) $ (heros)
 	where getIdValue (HeroId x) = x

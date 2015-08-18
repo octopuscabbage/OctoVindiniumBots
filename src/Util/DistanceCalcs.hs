@@ -1,5 +1,7 @@
 module Util.DistanceCalcs where
 
+impoint Util.Types
+
 --Distance Finding Functionns
 
 --Given a position and a set of other positions, find the element
@@ -12,8 +14,11 @@ findNearestNeighbor pointA points = snd $ foldl compareToMin maxBound points
 	
 
 --Given two points, calculate their walkable distance between each other
-walkableDistance ::  Num a => (a, a) -> (a, a) -> a
-walkableDistance (aX, aY) (bX, bY) = xdist + ydist
+walkableDistance :: Point -> Point -> Int
+walkableDistance (Point aX aY) (Point bX bY) = xdist + ydist
 	where 	xdist = abs $ aX - bX
 		ydist = abs $ aY - bY
 
+-- |Computes integer distance between points, rounding down
+diagonalDistance :: Point -> Point  -> Int
+diagonalDistance (Point aX aY) (Point bX bY) = floor $ sqrt (square (bX - aX) + square (bY - aY)
